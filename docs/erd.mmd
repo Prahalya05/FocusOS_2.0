@@ -1,0 +1,102 @@
+erDiagram
+  USERS ||--o{ FRIENDSPACES : "admin"
+  USERS ||--o{ FRIENDSPACES : "friend"
+  FRIENDSPACES ||--o{ TASKS : "has"
+  USERS ||--o{ TASKS : "created_by"
+  LEARNING_RESOURCES ||--o{ FRIENDSPACE_RESOURCES : "assigned"
+  FRIENDSPACES ||--o{ FRIENDSPACE_RESOURCES : "has"
+  FRIENDSPACES ||--o{ MOOD_LOGS : "has"
+  USERS ||--o{ MOOD_LOGS : "logs"
+  FRIENDSPACES ||--o{ XP_LOGS : "has"
+  USERS ||--o{ XP_LOGS : "earns"
+  FRIENDSPACES ||--o{ STREAKS : "has"
+  USERS ||--o{ STREAKS : "owns"
+  FRIENDSPACES ||--o{ MESSAGES : "has"
+  USERS ||--o{ MESSAGES : "sends"
+
+  USERS {
+    uuid id PK
+    text role
+    text display_name
+    text phone
+    timestamptz created_at
+  }
+  FRIENDSPACES {
+    uuid id PK
+    uuid admin_id FK
+    uuid friend_user_id FK
+    text title
+    timestamptz created_at
+  }
+  TASKS {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid created_by_user_id FK
+    text title
+    text description
+    text status
+    date due_date
+    text proof_url
+    int timer_seconds
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  LEARNING_RESOURCES {
+    uuid id PK
+    uuid created_by_admin_id FK
+    text type
+    text url
+    text title
+    text description
+    jsonb metadata
+    timestamptz created_at
+  }
+  FRIENDSPACE_RESOURCES {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid resource_id FK
+    uuid assigned_by_user_id FK
+    text status
+    int completion_percent
+    int quiz_score
+    int time_spent_seconds
+    timestamptz created_at
+  }
+  MOOD_LOGS {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid user_id FK
+    date log_date
+    int mood
+    int energy
+    int anxiety
+    text notes
+    timestamptz created_at
+  }
+  XP_LOGS {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid user_id FK
+    int amount
+    text category
+    text reason
+    timestamptz created_at
+  }
+  STREAKS {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid user_id FK
+    text kind
+    int current_count
+    int longest_count
+    timestamptz updated_at
+  }
+  MESSAGES {
+    uuid id PK
+    uuid friendspace_id FK
+    uuid sender_user_id FK
+    text text
+    timestamptz created_at
+  }
+
+
