@@ -1,4 +1,10 @@
+'use client'
+
+import { useData } from '@/lib/contexts/DataContext'
+
 export default function Dashboard() {
+  const { state } = useData()
+  const { tasks, timerSessions, moodEntries, friends, learningCourses } = state
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -17,7 +23,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-              <p className="text-2xl font-semibold text-gray-900">24</p>
+              <p className="text-2xl font-semibold text-gray-900">{tasks.length}</p>
             </div>
           </div>
         </div>
@@ -31,7 +37,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Completed</p>
-              <p className="text-2xl font-semibold text-gray-900">18</p>
+              <p className="text-2xl font-semibold text-gray-900">{tasks.filter(task => task.status === 'completed').length}</p>
             </div>
           </div>
         </div>
@@ -45,7 +51,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Focus Time</p>
-              <p className="text-2xl font-semibold text-gray-900">12h</p>
+              <p className="text-2xl font-semibold text-gray-900">{Math.round(timerSessions.reduce((total, session) => total + session.duration, 0) / 60)}h</p>
             </div>
           </div>
         </div>
@@ -59,7 +65,10 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Mood Score</p>
-              <p className="text-2xl font-semibold text-gray-900">8.5/10</p>
+              <p className="text-2xl font-semibold text-gray-900">{moodEntries.length > 0 ? (moodEntries.reduce((sum, entry) => {
+                const moodValues = { angry: 1, sad: 2, neutral: 5, happy: 8, excited: 10 }
+                return sum + moodValues[entry.mood]
+              }, 0) / moodEntries.length).toFixed(1) : '0'}/10</p>
             </div>
           </div>
         </div>

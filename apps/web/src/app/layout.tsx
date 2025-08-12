@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Link from 'next/link'
 import './globals.css'
+import { DataProvider } from '@/lib/contexts/DataContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -53,7 +54,9 @@ export default function RootLayout({
           </div>
         </nav>
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          {children}
+          <DataProvider>
+            {children}
+          </DataProvider>
         </main>
       </body>
     </html>

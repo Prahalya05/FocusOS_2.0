@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function Home() {
   return (
     <div className="space-y-8">
@@ -21,7 +23,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Task Management</h3>
           <p className="text-gray-600 mb-4">Organize your tasks, set priorities, and track your progress with our intuitive task management system.</p>
-          <a href="/tasks" className="text-blue-600 hover:text-blue-800 font-medium">Get Started →</a>
+          <Link href="/tasks" className="text-blue-600 hover:text-blue-800 font-medium">Get Started →</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
@@ -32,7 +34,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Focus Timer</h3>
           <p className="text-gray-600 mb-4">Stay focused with our Pomodoro timer. Set work sessions and breaks to maximize your productivity.</p>
-          <a href="/timer" className="text-green-600 hover:text-green-800 font-medium">Start Timer →</a>
+          <Link href="/timer" className="text-green-600 hover:text-green-800 font-medium">Start Timer →</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
@@ -43,7 +45,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Mood Tracking</h3>
           <p className="text-gray-600 mb-4">Monitor your daily mood and energy levels to understand patterns and optimize your productivity.</p>
-          <a href="/mood" className="text-purple-600 hover:text-purple-800 font-medium">Track Mood →</a>
+          <Link href="/mood" className="text-purple-600 hover:text-purple-800 font-medium">Track Mood →</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
@@ -54,7 +56,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Progress Analytics</h3>
           <p className="text-gray-600 mb-4">Visualize your progress with detailed analytics and insights to stay motivated and on track.</p>
-          <a href="/dashboard" className="text-orange-600 hover:text-orange-800 font-medium">View Analytics →</a>
+          <Link href="/dashboard" className="text-orange-600 hover:text-orange-800 font-medium">View Analytics →</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
@@ -65,7 +67,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Friend System</h3>
           <p className="text-gray-600 mb-4">Connect with friends, share goals, and motivate each other to achieve more together.</p>
-          <a href="/friends" className="text-red-600 hover:text-red-800 font-medium">Connect →</a>
+          <Link href="/friends" className="text-red-600 hover:text-red-800 font-medium">Connect →</Link>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
@@ -76,7 +78,7 @@ export default function Home() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Learning Hub</h3>
           <p className="text-gray-600 mb-4">Access curated learning content and resources to continuously improve your skills and knowledge.</p>
-          <a href="/learning" className="text-indigo-600 hover:text-indigo-800 font-medium">Learn More →</a>
+          <Link href="/learning" className="text-indigo-600 hover:text-indigo-800 font-medium">Learn More →</Link>
         </div>
       </div>
 
@@ -84,9 +86,9 @@ export default function Home() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-center text-white">
         <h2 className="text-2xl font-bold mb-4">Ready to boost your productivity?</h2>
         <p className="text-blue-100 mb-6">Start your journey with FocusOS today and transform how you work and learn.</p>
-        <a href="/dashboard" className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+        <Link href="/dashboard" className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
           Get Started Now
-        </a>
+        </Link>
       </div>
     </div>
   )
