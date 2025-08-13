@@ -224,8 +224,10 @@ export const demoAuth = {
   },
 
   async signOut() {
-    localStorage.removeItem('demoUser')
+    // Only clear the session, not the user data
+    // This allows the same user to log back in and access their data
     localStorage.removeItem('demoSession')
+    // localStorage.removeItem('demoUser') // REMOVED - keep user data
     return { error: null }
   },
 

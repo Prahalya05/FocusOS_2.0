@@ -189,15 +189,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authService = isSupabaseConfigured ? auth : demoAuth
       await authService.signOut()
 
-      // Clear user-specific data from localStorage
-      if (authState.user?.id) {
-        const userId = authState.user.id
-        localStorage.removeItem(`focusos_tasks_${userId}`)
-        localStorage.removeItem(`focusos_timer_sessions_${userId}`)
-        localStorage.removeItem(`focusos_mood_entries_${userId}`)
-        localStorage.removeItem(`focusos_friends_${userId}`)
-        localStorage.removeItem(`focusos_learning_courses_${userId}`)
-      }
+      // Don't delete data from localStorage - just clear the session
+      // Data should persist so it can be restored when logging back in
+      // localStorage.removeItem(`focusos_tasks_${userId}`) // REMOVED
+      // localStorage.removeItem(`focusos_timer_sessions_${userId}`) // REMOVED
+      // localStorage.removeItem(`focusos_mood_entries_${userId}`) // REMOVED
+      // localStorage.removeItem(`focusos_friends_${userId}`) // REMOVED
+      // localStorage.removeItem(`focusos_learning_courses_${userId}`) // REMOVED
 
       setAuthState({
         user: null,
@@ -206,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: false
       })
 
-      // Note: DataContext will handle clearing data when user changes
+      // Note: DataContext will handle clearing data from context when user changes
     } catch (error) {
       console.error('Sign out error:', error)
     } finally {
