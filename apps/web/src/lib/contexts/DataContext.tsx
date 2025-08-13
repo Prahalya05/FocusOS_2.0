@@ -1,17 +1,18 @@
 'use client'
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
+import { useAuth } from './AuthContext'
 
 // Types
 export interface Task {
   id: string
   title: string
   description: string
+  status: 'pending' | 'in-progress' | 'completed'
   priority: 'low' | 'medium' | 'high'
-  status: 'todo' | 'in-progress' | 'completed'
   dueDate: string
-  category: string
   createdAt: string
+  updatedAt: string
 }
 
 export interface TimerSession {
@@ -25,9 +26,9 @@ export interface TimerSession {
 
 export interface MoodEntry {
   id: string
-  mood: 'angry' | 'sad' | 'neutral' | 'happy' | 'excited'
-  description: string
-  factors: string[]
+  mood: 'excellent' | 'good' | 'okay' | 'bad' | 'terrible'
+  energy: 'high' | 'medium' | 'low'
+  notes: string
   timestamp: string
 }
 
@@ -35,145 +36,103 @@ export interface Friend {
   id: string
   name: string
   email: string
-  status: 'pending' | 'accepted' | 'online' | 'offline'
-  lastActive: string
-  avatar: string
+  status: 'pending' | 'accepted' | 'blocked'
+  createdAt: string
 }
 
 export interface LearningCourse {
   id: string
   title: string
   description: string
-  category: string
-  difficulty: 'beginner' | 'intermediate' | 'advanced'
-  duration: number
   progress: number
-  rating: number
-  enrolled: boolean
+  status: 'not-started' | 'in-progress' | 'completed'
+  createdAt: string
+  updatedAt: string
 }
 
 // State interface
-interface AppState {
+interface DataState {
   tasks: Task[]
   timerSessions: TimerSession[]
   moodEntries: MoodEntry[]
   friends: Friend[]
   learningCourses: LearningCourse[]
-  isLoading: boolean
-  error: string | null
 }
 
 // Action types
-type AppAction =
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }
+type DataAction =
   | { type: 'SET_TASKS'; payload: Task[] }
   | { type: 'ADD_TASK'; payload: Task }
   | { type: 'UPDATE_TASK'; payload: Task }
   | { type: 'DELETE_TASK'; payload: string }
   | { type: 'SET_TIMER_SESSIONS'; payload: TimerSession[] }
   | { type: 'ADD_TIMER_SESSION'; payload: TimerSession }
-  | { type: 'UPDATE_TIMER_SESSION'; payload: TimerSession }
   | { type: 'SET_MOOD_ENTRIES'; payload: MoodEntry[] }
   | { type: 'ADD_MOOD_ENTRY'; payload: MoodEntry }
-  | { type: 'DELETE_MOOD_ENTRY'; payload: string }
   | { type: 'SET_FRIENDS'; payload: Friend[] }
   | { type: 'ADD_FRIEND'; payload: Friend }
   | { type: 'UPDATE_FRIEND'; payload: Friend }
-  | { type: 'UPDATE_FRIEND_STATUS'; payload: { id: string; status: Friend['status'] } }
-  | { type: 'DELETE_FRIEND'; payload: string }
   | { type: 'SET_LEARNING_COURSES'; payload: LearningCourse[] }
-  | { type: 'UPDATE_COURSE_PROGRESS'; payload: { id: string; progress: number } }
+  | { type: 'ADD_LEARNING_COURSE'; payload: LearningCourse }
+  | { type: 'UPDATE_LEARNING_COURSE'; payload: LearningCourse }
 
-// Initial state
-const initialState: AppState = {
+// Initial state - NO DEFAULT DATA
+const initialState: DataState = {
   tasks: [],
   timerSessions: [],
   moodEntries: [],
   friends: [],
-  learningCourses: [],
-  isLoading: false,
-  error: null
+  learningCourses: []
 }
 
-// Reducer
-function appReducer(state: AppState, action: AppAction): AppState {
+// Reducer function
+function dataReducer(state: DataState, action: DataAction): DataState {
   switch (action.type) {
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload }
-    case 'SET_ERROR':
-      return { ...state, error: action.payload }
     case 'SET_TASKS':
       return { ...state, tasks: action.payload }
     case 'ADD_TASK':
-      return { ...state, tasks: [action.payload, ...state.tasks] }
+      return { ...state, tasks: [...state.tasks, action.payload] }
     case 'UPDATE_TASK':
-      return { 
-        ...state, 
-        tasks: state.tasks.map(task => 
+      return {
+        ...state,
+        tasks: state.tasks.map(task =>
           task.id === action.payload.id ? action.payload : task
-        ) 
+        )
       }
     case 'DELETE_TASK':
-      return { 
-        ...state, 
-        tasks: state.tasks.filter(task => task.id !== action.payload) 
+      return {
+        ...state,
+        tasks: state.tasks.filter(task => task.id !== action.payload)
       }
     case 'SET_TIMER_SESSIONS':
       return { ...state, timerSessions: action.payload }
     case 'ADD_TIMER_SESSION':
-      return { ...state, timerSessions: [action.payload, ...state.timerSessions] }
-    case 'UPDATE_TIMER_SESSION':
-      return { 
-        ...state, 
-        timerSessions: state.timerSessions.map(session => 
-          session.id === action.payload.id ? action.payload : session
-        ) 
-      }
+      return { ...state, timerSessions: [...state.timerSessions, action.payload] }
     case 'SET_MOOD_ENTRIES':
       return { ...state, moodEntries: action.payload }
     case 'ADD_MOOD_ENTRY':
-      return { ...state, moodEntries: [action.payload, ...state.moodEntries] }
-    case 'DELETE_MOOD_ENTRY':
-      return { 
-        ...state, 
-        moodEntries: state.moodEntries.filter(entry => entry.id !== action.payload) 
-      }
+      return { ...state, moodEntries: [...state.moodEntries, action.payload] }
     case 'SET_FRIENDS':
       return { ...state, friends: action.payload }
     case 'ADD_FRIEND':
       return { ...state, friends: [...state.friends, action.payload] }
     case 'UPDATE_FRIEND':
-      return { 
-        ...state, 
-        friends: state.friends.map(friend => 
+      return {
+        ...state,
+        friends: state.friends.map(friend =>
           friend.id === action.payload.id ? action.payload : friend
-        ) 
-      }
-    case 'UPDATE_FRIEND_STATUS':
-      return { 
-        ...state, 
-        friends: state.friends.map(friend => 
-          friend.id === action.payload.id 
-            ? { ...friend, status: action.payload.status }
-            : friend
-        ) 
-      }
-    case 'DELETE_FRIEND':
-      return { 
-        ...state, 
-        friends: state.friends.filter(friend => friend.id !== action.payload) 
+        )
       }
     case 'SET_LEARNING_COURSES':
       return { ...state, learningCourses: action.payload }
-    case 'UPDATE_COURSE_PROGRESS':
-      return { 
-        ...state, 
-        learningCourses: state.learningCourses.map(course => 
-          course.id === action.payload.id 
-            ? { ...course, progress: action.payload.progress }
-            : course
-        ) 
+    case 'ADD_LEARNING_COURSE':
+      return { ...state, learningCourses: [...state.learningCourses, action.payload] }
+    case 'UPDATE_LEARNING_COURSE':
+      return {
+        ...state,
+        learningCourses: state.learningCourses.map(course =>
+          course.id === action.payload.id ? action.payload : course
+        )
       }
     default:
       return state
@@ -182,177 +141,144 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 // Context
 const DataContext = createContext<{
-  state: AppState
-  dispatch: React.Dispatch<AppAction>
+  state: DataState
+  dispatch: React.Dispatch<DataAction>
   actions: {
-    addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void
+    addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
     updateTask: (task: Task) => void
     deleteTask: (id: string) => void
     addTimerSession: (session: Omit<TimerSession, 'id'>) => void
-    updateTimerSession: (session: TimerSession) => void
-    addMoodEntry: (entry: Omit<MoodEntry, 'id'>) => void
-    deleteMoodEntry: (id: string) => void
-    addFriend: (friend: Omit<Friend, 'id'>) => void
+    addMoodEntry: (entry: Omit<MoodEntry, 'id' | 'timestamp'>) => void
+    addFriend: (friend: Omit<Friend, 'id' | 'createdAt'>) => void
     updateFriend: (friend: Friend) => void
-    updateFriendStatus: (id: string, status: Friend['status']) => void
-    deleteFriend: (id: string) => void
-    updateCourseProgress: (id: string, progress: number) => void
+    addLearningCourse: (course: Omit<LearningCourse, 'id' | 'createdAt' | 'updatedAt'>) => void
+    updateLearningCourse: (course: LearningCourse) => void
   }
 } | null>(null)
 
 // Provider component
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState)
+  const [state, dispatch] = useReducer(dataReducer, initialState)
+  const { authState } = useAuth()
 
-  // Initialize with sample data
+  // Load data from localStorage on mount
   useEffect(() => {
-    const initializeData = () => {
-      // Sample tasks
-      const sampleTasks: Task[] = [
-        {
-          id: '1',
-          title: 'Complete project proposal',
-          description: 'Write and submit the quarterly project proposal for Q1',
-          priority: 'high',
-          status: 'in-progress',
-          dueDate: '2024-01-15',
-          category: 'Work',
-          createdAt: '2024-01-10'
-        },
-        {
-          id: '2',
-          title: 'Review code changes',
-          description: 'Review pull requests and provide feedback to team members',
-          priority: 'medium',
-          status: 'todo',
-          dueDate: '2024-01-12',
-          category: 'Development',
-          createdAt: '2024-01-10'
-        },
-        {
-          id: '3',
-          title: 'Update documentation',
-          description: 'Update API documentation with new endpoints',
-          priority: 'low',
-          status: 'completed',
-          dueDate: '2024-01-08',
-          category: 'Documentation',
-          createdAt: '2024-01-05'
+    try {
+      if (authState.user?.id) {
+        // Load user-specific data
+        const userId = authState.user.id
+        
+        const storedTasks = localStorage.getItem(`focusos_tasks_${userId}`)
+        if (storedTasks) {
+          dispatch({ type: 'SET_TASKS', payload: JSON.parse(storedTasks) })
         }
-      ]
 
-      // Sample mood entries
-      const sampleMoodEntries: MoodEntry[] = [
-        {
-          id: '1',
-          mood: 'happy',
-          description: 'Had a great workout this morning and feeling energized',
-          factors: ['Exercise', 'Health'],
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: '2',
-          mood: 'neutral',
-          description: 'Regular work day, nothing special',
-          factors: ['Work'],
-          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: '3',
-          mood: 'excited',
-          description: 'Completed a challenging project successfully!',
-          factors: ['Work', 'Social'],
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const storedTimerSessions = localStorage.getItem(`focusos_timer_sessions_${userId}`)
+        if (storedTimerSessions) {
+          dispatch({ type: 'SET_TIMER_SESSIONS', payload: JSON.parse(storedTimerSessions) })
         }
-      ]
 
-      // Sample friends
-      const sampleFriends: Friend[] = [
-        {
-          id: '1',
-          name: 'Mike Wilson',
-          email: 'mike.w@example.com',
-          status: 'online',
-          lastActive: new Date().toISOString(),
-          avatar: 'MW'
-        },
-        {
-          id: '2',
-          name: 'Alex Lee',
-          email: 'alex.lee@example.com',
-          status: 'offline',
-          lastActive: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-          avatar: 'AL'
-        },
-        {
-          id: '3',
-          name: 'Rachel Kim',
-          email: 'rachel.k@example.com',
-          status: 'online',
-          lastActive: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          avatar: 'RK'
+        const storedMoodEntries = localStorage.getItem(`focusos_mood_entries_${userId}`)
+        if (storedMoodEntries) {
+          dispatch({ type: 'SET_MOOD_ENTRIES', payload: JSON.parse(storedMoodEntries) })
         }
-      ]
 
-      // Sample learning courses
-      const sampleCourses: LearningCourse[] = [
-        {
-          id: '1',
-          title: 'Productivity Fundamentals',
-          description: 'Learn the basics of time management and productivity techniques.',
-          category: 'Time Management',
-          difficulty: 'beginner',
-          duration: 2,
-          progress: 75,
-          rating: 4.8,
-          enrolled: true
-        },
-        {
-          id: '2',
-          title: 'Advanced Focus Techniques',
-          description: 'Master deep work and concentration strategies for better results.',
-          category: 'Focus',
-          difficulty: 'intermediate',
-          duration: 3.5,
-          progress: 60,
-          rating: 4.9,
-          enrolled: true
-        },
-        {
-          id: '3',
-          title: 'Mindfulness & Well-being',
-          description: 'Develop mental clarity and emotional balance for sustained focus.',
-          category: 'Wellness',
-          difficulty: 'advanced',
-          duration: 5,
-          progress: 0,
-          rating: 4.7,
-          enrolled: false
+        const storedFriends = localStorage.getItem(`focusos_friends_${userId}`)
+        if (storedFriends) {
+          dispatch({ type: 'SET_FRIENDS', payload: JSON.parse(storedFriends) })
         }
-      ]
 
-      dispatch({ type: 'SET_TASKS', payload: sampleTasks })
-      dispatch({ type: 'SET_MOOD_ENTRIES', payload: sampleMoodEntries })
-      dispatch({ type: 'SET_FRIENDS', payload: sampleFriends })
-      dispatch({ type: 'SET_LEARNING_COURSES', payload: sampleCourses })
+        const storedLearningCourses = localStorage.getItem(`focusos_learning_courses_${userId}`)
+        if (storedLearningCourses) {
+          dispatch({ type: 'SET_LEARNING_COURSES', payload: JSON.parse(storedLearningCourses) })
+        }
+      } else {
+        // Clear data when no user is authenticated
+        dispatch({ type: 'SET_TASKS', payload: [] })
+        dispatch({ type: 'SET_TIMER_SESSIONS', payload: [] })
+        dispatch({ type: 'SET_MOOD_ENTRIES', payload: [] })
+        dispatch({ type: 'SET_FRIENDS', payload: [] })
+        dispatch({ type: 'SET_LEARNING_COURSES', payload: [] })
+      }
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error)
     }
+  }, [authState.user?.id])
 
-    initializeData()
-  }, [])
+  // Save data to localStorage whenever state changes
+  useEffect(() => {
+    try {
+      if (authState.user?.id) {
+        const userId = authState.user.id
+        localStorage.setItem(`focusos_tasks_${userId}`, JSON.stringify(state.tasks))
+      }
+    } catch (error) {
+      console.error('Error saving tasks to localStorage:', error)
+    }
+  }, [state.tasks, authState.user?.id])
+
+  useEffect(() => {
+    try {
+      if (authState.user?.id) {
+        const userId = authState.user.id
+        localStorage.setItem(`focusos_timer_sessions_${userId}`, JSON.stringify(state.timerSessions))
+      }
+    } catch (error) {
+      console.error('Error saving timer sessions to localStorage:', error)
+    }
+  }, [state.timerSessions, authState.user?.id])
+
+  useEffect(() => {
+    try {
+      if (authState.user?.id) {
+        const userId = authState.user.id
+        localStorage.setItem(`focusos_mood_entries_${userId}`, JSON.stringify(state.moodEntries))
+      }
+    } catch (error) {
+      console.error('Error saving mood entries to localStorage:', error)
+    }
+  }, [state.moodEntries, authState.user?.id])
+
+  useEffect(() => {
+    try {
+      if (authState.user?.id) {
+        const userId = authState.user.id
+        localStorage.setItem(`focusos_friends_${userId}`, JSON.stringify(state.friends))
+      }
+    } catch (error) {
+      console.error('Error saving friends to localStorage:', error)
+    }
+  }, [state.friends, authState.user?.id])
+
+  useEffect(() => {
+    try {
+      if (authState.user?.id) {
+        const userId = authState.user.id
+        localStorage.setItem(`focusos_learning_courses_${userId}`, JSON.stringify(state.learningCourses))
+      }
+    } catch (error) {
+      console.error('Error saving learning courses to localStorage:', error)
+    }
+  }, [state.learningCourses, authState.user?.id])
 
   // Action creators
   const actions = {
-    addTask: (taskData: Omit<Task, 'id' | 'createdAt'>) => {
+    addTask: (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
       const newTask: Task = {
         ...taskData,
         id: Date.now().toString(),
-        createdAt: new Date().toISOString().split('T')[0]
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
       dispatch({ type: 'ADD_TASK', payload: newTask })
     },
 
     updateTask: (task: Task) => {
-      dispatch({ type: 'UPDATE_TASK', payload: task })
+      const updatedTask = {
+        ...task,
+        updatedAt: new Date().toISOString()
+      }
+      dispatch({ type: 'UPDATE_TASK', payload: updatedTask })
     },
 
     deleteTask: (id: string) => {
@@ -367,26 +293,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'ADD_TIMER_SESSION', payload: newSession })
     },
 
-    updateTimerSession: (session: TimerSession) => {
-      dispatch({ type: 'UPDATE_TIMER_SESSION', payload: session })
-    },
-
-    addMoodEntry: (entryData: Omit<MoodEntry, 'id'>) => {
+    addMoodEntry: (entryData: Omit<MoodEntry, 'id' | 'timestamp'>) => {
       const newEntry: MoodEntry = {
         ...entryData,
-        id: Date.now().toString()
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString()
       }
       dispatch({ type: 'ADD_MOOD_ENTRY', payload: newEntry })
     },
 
-    deleteMoodEntry: (id: string) => {
-      dispatch({ type: 'DELETE_MOOD_ENTRY', payload: id })
-    },
-
-    addFriend: (friendData: Omit<Friend, 'id'>) => {
+    addFriend: (friendData: Omit<Friend, 'id' | 'createdAt'>) => {
       const newFriend: Friend = {
         ...friendData,
-        id: Date.now().toString()
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
       }
       dispatch({ type: 'ADD_FRIEND', payload: newFriend })
     },
@@ -395,16 +315,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'UPDATE_FRIEND', payload: friend })
     },
 
-    updateFriendStatus: (id: string, status: Friend['status']) => {
-      dispatch({ type: 'UPDATE_FRIEND_STATUS', payload: { id, status } })
+    addLearningCourse: (courseData: Omit<LearningCourse, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const newCourse: LearningCourse = {
+        ...courseData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      dispatch({ type: 'ADD_LEARNING_COURSE', payload: newCourse })
     },
 
-    deleteFriend: (id: string) => {
-      dispatch({ type: 'DELETE_FRIEND', payload: id })
-    },
-
-    updateCourseProgress: (id: string, progress: number) => {
-      dispatch({ type: 'UPDATE_COURSE_PROGRESS', payload: { id, progress } })
+    updateLearningCourse: (course: LearningCourse) => {
+      const updatedCourse = {
+        ...course,
+        updatedAt: new Date().toISOString()
+      }
+      dispatch({ type: 'UPDATE_LEARNING_COURSE', payload: updatedCourse })
     }
   }
 
@@ -415,7 +341,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Hook to use the context
+// Hook to use the data context
 export function useData() {
   const context = useContext(DataContext)
   if (!context) {

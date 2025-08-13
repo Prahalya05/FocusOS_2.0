@@ -1,402 +1,382 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useRef } from 'react'
+import { useData } from '@/lib/contexts/DataContext'
 
-interface Session {
-  id: string
-  type: 'focus' | 'short-break' | 'long-break'
-  duration: number
-  startTime: string
-  endTime?: string
-  status: 'completed' | 'in-progress' | 'paused'
+interface TimerState {
+  isRunning: boolean
+  isBreak: boolean
+  timeLeft: number
+  totalTime: number
+  mode: 'focus' | 'short-break' | 'long-break'
+}
+
+const TIMER_SETTINGS = {
+  focus: 25 * 60, // 25 minutes
+  shortBreak: 5 * 60, // 5 minutes
+  longBreak: 15 * 60 // 15 minutes
 }
 
 export default function TimerPage() {
-  const [timeLeft, setTimeLeft] = useState(25 * 60) // 25 minutes in seconds
-  const [isRunning, setIsRunning] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [sessionType, setSessionType] = useState<'focus' | 'short-break' | 'long-break'>('focus')
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [currentSession, setCurrentSession] = useState<Session | null>(null)
-  const [settings, setSettings] = useState({
-    focusTime: 25,
-    shortBreak: 5,
-    longBreak: 15,
-    autoStartBreaks: true
+  const { actions } = useData()
+  const [timerState, setTimerState] = useState<TimerState>({
+    isRunning: false,
+    isBreak: false,
+    timeLeft: TIMER_SETTINGS.focus,
+    totalTime: TIMER_SETTINGS.focus,
+    mode: 'focus'
   })
+  
+  const [completedSessions, setCompletedSessions] = useState(0)
+  const [autoStartBreaks, setAutoStartBreaks] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Initialize audio
+  useEffect(() => {
+    audioRef.current = new Audio('/notification.mp3') // You'll need to add this audio file
+    // Fallback to browser notification if audio fails
+    if (!audioRef.current) {
+      console.log('Audio not available, using browser notifications')
+    }
+  }, [])
 
   // Timer logic
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
-
-    if (isRunning && !isPaused && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Session completed
-            completeSession()
-            return 0
+    if (timerState.isRunning && timerState.timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimerState(prev => {
+          if (prev.timeLeft <= 1) {
+            // Timer finished
+            playNotificationSound()
+            showNotification()
+            
+            if (prev.mode === 'focus') {
+              // Focus session completed
+              setCompletedSessions(prev => prev + 1)
+              
+              // Don't auto-start break, wait for user
+              return {
+                ...prev,
+                isRunning: false,
+                timeLeft: 0
+              }
+            } else {
+              // Break finished
+              return {
+                ...prev,
+                isRunning: false,
+                timeLeft: 0
+              }
+            }
           }
-          return prev - 1
+          
+          return {
+            ...prev,
+            timeLeft: prev.timeLeft - 1
+          }
         })
       }, 1000)
     }
 
     return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [isRunning, isPaused, timeLeft])
-
-  const completeSession = useCallback(() => {
-    if (currentSession) {
-      const updatedSession = {
-        ...currentSession,
-        endTime: new Date().toISOString(),
-        status: 'completed' as const
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
       }
-      setSessions(prev => [updatedSession, ...prev])
-      setCurrentSession(null)
-      setIsRunning(false)
-      setIsPaused(false)
+    }
+  }, [timerState.isRunning, timerState.timeLeft, timerState.mode])
+
+  // Play notification sound
+  const playNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {
+        console.log('Audio playback failed, using browser notification')
+      })
+    }
+  }
+
+  // Show browser notification
+  const showNotification = () => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const title = timerState.mode === 'focus' ? 'Focus Session Complete!' : 'Break Time Over!'
+      const body = timerState.mode === 'focus' 
+        ? 'Great job! Take a break or start another session.' 
+        : 'Break time is over. Ready to focus again?'
       
-      // Auto-start break if enabled
-      if (settings.autoStartBreaks && sessionType === 'focus') {
-        startShortBreak()
-      }
+      new Notification(title, { body })
     }
-  }, [currentSession, settings.autoStartBreaks, sessionType])
+  }
 
-  const startSession = (type: 'focus' | 'short-break' | 'long-break') => {
-    const duration = type === 'focus' ? settings.focusTime : 
-                    type === 'short-break' ? settings.shortBreak : 
-                    settings.longBreak
-    
-    const newSession: Session = {
-      id: Date.now().toString(),
-      type,
-      duration: duration * 60,
-      startTime: new Date().toISOString(),
-      status: 'in-progress'
+  // Request notification permission
+  const requestNotificationPermission = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
     }
-    
-    setCurrentSession(newSession)
-    setSessionType(type)
-    setTimeLeft(duration * 60)
-    setIsRunning(true)
-    setIsPaused(false)
   }
 
-  const startShortBreak = () => {
-    startSession('short-break')
+  // Start timer
+  const startTimer = () => {
+    setTimerState(prev => ({ ...prev, isRunning: true }))
   }
 
-  const startLongBreak = () => {
-    startSession('long-break')
-  }
-
+  // Pause timer
   const pauseTimer = () => {
-    if (currentSession) {
-      setCurrentSession(prev => prev ? { ...prev, status: 'paused' } : null)
-      setIsPaused(true)
-    }
+    setTimerState(prev => ({ ...prev, isRunning: false }))
   }
 
-  const resumeTimer = () => {
-    if (currentSession) {
-      setCurrentSession(prev => prev ? { ...prev, status: 'in-progress' } : null)
-      setIsPaused(false)
-    }
+  // Stop timer and reset
+  const stopTimer = () => {
+    setTimerState(prev => ({
+      ...prev,
+      isRunning: false,
+      timeLeft: prev.totalTime
+    }))
   }
 
-  const resetTimer = () => {
-    setIsRunning(false)
-    setIsPaused(false)
-    setCurrentSession(null)
-    setTimeLeft(settings.focusTime * 60)
-    setSessionType('focus')
+  // Switch to focus mode
+  const switchToFocus = () => {
+    setTimerState({
+      isRunning: false,
+      isBreak: false,
+      timeLeft: TIMER_SETTINGS.focus,
+      totalTime: TIMER_SETTINGS.focus,
+      mode: 'focus'
+    })
   }
 
-  const updateSettings = (newSettings: Partial<typeof settings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }))
-    if (!isRunning) {
-      setTimeLeft(newSettings.focusTime ? newSettings.focusTime * 60 : timeLeft)
-    }
+  // Switch to short break
+  const switchToShortBreak = () => {
+    setTimerState({
+      isRunning: false,
+      isBreak: true,
+      timeLeft: TIMER_SETTINGS.shortBreak,
+      totalTime: TIMER_SETTINGS.shortBreak,
+      mode: 'short-break'
+    })
   }
 
+  // Switch to long break
+  const switchToLongBreak = () => {
+    setTimerState({
+      isRunning: false,
+      isBreak: true,
+      timeLeft: TIMER_SETTINGS.longBreak,
+      totalTime: TIMER_SETTINGS.longBreak,
+      mode: 'long-break'
+    })
+  }
+
+  // Format time display
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const getSessionStats = () => {
-    const today = new Date().toISOString().split('T')[0]
-    const todaySessions = sessions.filter(s => s.startTime.startsWith(today))
-    const completedSessions = todaySessions.filter(s => s.status === 'completed')
-    const totalMinutes = completedSessions.reduce((acc, s) => acc + s.duration / 60, 0)
-    
-    return {
-      totalMinutes: Math.round(totalMinutes),
-      sessionsCount: completedSessions.length,
-      focusRate: completedSessions.length > 0 ? 
-        Math.round((completedSessions.filter(s => s.type === 'focus').length / completedSessions.length) * 100) : 0
+  // Calculate progress percentage
+  const progressPercentage = ((timerState.totalTime - timerState.timeLeft) / timerState.totalTime) * 100
+
+  // Save completed session
+  const saveSession = () => {
+    if (timerState.mode === 'focus' && timerState.timeLeft === 0) {
+      actions.addTimerSession({
+        type: 'focus',
+        duration: TIMER_SETTINGS.focus,
+        startTime: new Date(Date.now() - TIMER_SETTINGS.focus * 1000).toISOString(),
+        endTime: new Date().toISOString(),
+        status: 'completed'
+      })
     }
   }
 
-  const stats = getSessionStats()
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-gray-200 pb-4">
-        <h1 className="text-3xl font-bold text-gray-900">Focus Timer</h1>
-        <p className="mt-2 text-gray-600">Stay focused and productive with timed sessions</p>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Focus Timer</h1>
+        <p className="text-gray-600">Stay focused and productive with Pomodoro technique</p>
       </div>
 
-      {/* Main Timer Display */}
-      <div className="bg-white p-8 rounded-lg shadow-sm border text-center">
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Current Session</h2>
-          <div className="text-6xl font-bold text-blue-600 font-mono">
-            {formatTime(timeLeft)}
-          </div>
-          <p className="text-gray-600 mt-2">
-            {sessionType === 'focus' ? 'Focus Time' : 
-             sessionType === 'short-break' ? 'Short Break' : 'Long Break'}
-          </p>
-        </div>
-
-        {/* Timer Controls */}
-        <div className="flex justify-center space-x-4 mb-8">
-          {!isRunning ? (
-            <button 
-              onClick={() => startSession(sessionType)}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium"
-            >
-              Start
-            </button>
-          ) : isPaused ? (
-            <button 
-              onClick={resumeTimer}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium"
-            >
-              Resume
-            </button>
-          ) : (
-            <button 
-              onClick={pauseTimer}
-              className="bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 font-medium"
-            >
-              Pause
-            </button>
-          )}
-          
-          <button 
-            onClick={resetTimer}
-            className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium"
-          >
-            Reset
-          </button>
-        </div>
-
-        {/* Session Type */}
-        <div className="flex justify-center space-x-2">
-          <button 
-            onClick={() => startSession('focus')}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sessionType === 'focus' 
+      {/* Timer Display */}
+      <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+        <div className="text-center">
+          {/* Mode Indicator */}
+          <div className="mb-6">
+            <span className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${
+              timerState.mode === 'focus' 
                 ? 'bg-blue-100 text-blue-800' 
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-            }`}
-          >
-            Focus ({settings.focusTime}m)
-          </button>
-          <button 
-            onClick={startShortBreak}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sessionType === 'short-break' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-            }`}
-          >
-            Short Break ({settings.shortBreak}m)
-          </button>
-          <button 
-            onClick={startLongBreak}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sessionType === 'long-break' 
-                ? 'bg-purple-100 text-purple-800' 
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-            }`}
-          >
-            Long Break ({settings.longBreak}m)
-          </button>
-        </div>
-      </div>
+                : 'bg-green-100 text-green-800'
+            }`}>
+              {timerState.mode === 'focus' ? 'Focus Time' : 'Break Time'}
+            </span>
+          </div>
 
-      {/* Timer Settings */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Timer Settings</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label htmlFor="focusTime" className="block text-sm font-medium text-gray-700 mb-2">
-              Focus Duration (minutes)
-            </label>
-            <input
-              type="number"
-              id="focusTime"
-              value={settings.focusTime}
-              onChange={(e) => updateSettings({ focusTime: parseInt(e.target.value) || 25 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              min="1"
-              max="120"
-            />
+          {/* Timer Display */}
+          <div className="text-8xl font-mono font-bold text-gray-900 mb-6">
+            {formatTime(timerState.timeLeft)}
           </div>
-          <div>
-            <label htmlFor="shortBreak" className="block text-sm font-medium text-gray-700 mb-2">
-              Short Break (minutes)
-            </label>
-            <input
-              type="number"
-              id="shortBreak"
-              value={settings.shortBreak}
-              onChange={(e) => updateSettings({ shortBreak: parseInt(e.target.value) || 5 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              min="1"
-              max="30"
-            />
-          </div>
-          <div>
-            <label htmlFor="longBreak" className="block text-sm font-medium text-gray-700 mb-2">
-              Long Break (minutes)
-            </label>
-            <input
-              type="number"
-              id="longBreak"
-              value={settings.longBreak}
-              onChange={(e) => updateSettings({ longBreak: parseInt(e.target.value) || 15 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              min="1"
-              max="60"
-            />
-          </div>
-        </div>
-        <div className="mt-4">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={settings.autoStartBreaks}
-              onChange={(e) => updateSettings({ autoStartBreaks: e.target.checked })}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="ml-2 text-sm text-gray-700">Auto-start breaks</span>
-          </label>
-        </div>
-      </div>
 
-      {/* Today's Sessions */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Today's Sessions</h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {sessions.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-500">
-              No sessions completed today. Start your first focus session!
-            </div>
-          ) : (
-            sessions.slice(0, 5).map((session) => (
-              <div key={session.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">
-                      {session.type === 'focus' ? 'Focus Session' : 
-                       session.type === 'short-break' ? 'Short Break' : 'Long Break'}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {new Date(session.startTime).toLocaleTimeString()} - 
-                      {session.endTime ? new Date(session.endTime).toLocaleTimeString() : 'In Progress'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {Math.round(session.duration / 60)} minutes
-                    </div>
-                    <div className={`text-sm ${
-                      session.status === 'completed' ? 'text-green-600' : 
-                      session.status === 'in-progress' ? 'text-blue-600' : 'text-yellow-600'
-                    }`}>
-                      {session.status === 'completed' ? 'Completed' : 
-                       session.status === 'in-progress' ? 'In Progress' : 'Paused'}
-                    </div>
-                  </div>
-                </div>
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
+            <div 
+              className={`h-3 rounded-full transition-all duration-1000 ${
+                timerState.mode === 'focus' ? 'bg-blue-600' : 'bg-green-600'
+              }`}
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+
+          {/* Timer Controls */}
+          <div className="flex justify-center space-x-4 mb-6">
+            {!timerState.isRunning ? (
+              <button
+                onClick={startTimer}
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Start
+              </button>
+            ) : (
+              <button
+                onClick={pauseTimer}
+                className="bg-yellow-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+              >
+                Pause
+              </button>
+            )}
+            
+            <button
+              onClick={stopTimer}
+              className="bg-red-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              Stop
+            </button>
+          </div>
+
+          {/* Session Complete Actions */}
+          {timerState.timeLeft === 0 && timerState.mode === 'focus' && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-medium text-green-800 mb-2">🎉 Focus Session Complete!</h3>
+              <p className="text-green-700 mb-4">Great job! Take a break or start another session.</p>
+              <div className="flex justify-center space-x-3">
+                <button
+                  onClick={switchToShortBreak}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                >
+                  Take Short Break (5 min)
+                </button>
+                <button
+                  onClick={switchToLongBreak}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                >
+                  Take Long Break (15 min)
+                </button>
+                <button
+                  onClick={switchToFocus}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Start New Session
+                </button>
               </div>
-            ))
+            </div>
+          )}
+
+          {/* Break Complete Actions */}
+          {timerState.timeLeft === 0 && timerState.isBreak && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-medium text-blue-800 mb-2">⏰ Break Time Over!</h3>
+              <p className="text-blue-700 mb-4">Ready to focus again?</p>
+              <button
+                onClick={switchToFocus}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              >
+                Start Focus Session
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Focus Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.totalMinutes}</div>
-          <div className="text-sm text-gray-600">Minutes Today</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.sessionsCount}</div>
-          <div className="text-sm text-gray-600">Sessions Today</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center">
-          <div className="text-2xl font-bold text-purple-600">{stats.focusRate}%</div>
-          <div className="text-sm text-gray-600">Focus Rate</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center">
-          <div className="text-2xl font-bold text-orange-600">
-            {Math.floor(stats.totalMinutes / settings.focusTime)}
-          </div>
-          <div className="text-sm text-gray-600">Focus Sessions</div>
+      {/* Timer Mode Selection */}
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Timer Modes</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={switchToFocus}
+            className={`p-4 rounded-lg border-2 transition-all ${
+              timerState.mode === 'focus'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-2">🎯</div>
+              <div className="font-medium text-gray-900">Focus</div>
+              <div className="text-sm text-gray-600">25 minutes</div>
+            </div>
+          </button>
+
+          <button
+            onClick={switchToShortBreak}
+            className={`p-4 rounded-lg border-2 transition-all ${
+              timerState.mode === 'short-break'
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-green-300'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-2">☕</div>
+              <div className="font-medium text-gray-900">Short Break</div>
+              <div className="text-sm text-gray-600">5 minutes</div>
+            </div>
+          </button>
+
+          <button
+            onClick={switchToLongBreak}
+            className={`p-4 rounded-lg border-2 transition-all ${
+              timerState.mode === 'long-break'
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-green-300'
+            }`}
+          >
+            <div className="text-center">
+              <div className="text-2xl mb-2">🌴</div>
+              <div className="font-medium text-gray-900">Long Break</div>
+              <div className="text-sm text-gray-600">15 minutes</div>
+            </div>
+          </button>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button 
-            onClick={() => startSession('focus')}
-            className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-          >
-            <div className="text-blue-600 text-2xl mb-2">🎯</div>
-            <div className="text-sm font-medium text-gray-900">Quick Focus</div>
-            <div className="text-xs text-gray-600">15 min session</div>
-          </button>
-          <button 
-            onClick={startShortBreak}
-            className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-          >
-            <div className="text-green-600 text-2xl mb-2">☕</div>
-            <div className="text-sm font-medium text-gray-900">Take Break</div>
-            <div className="text-xs text-gray-600">5 min break</div>
-          </button>
-          <Link 
-            href="/dashboard"
-            className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-          >
-            <div className="text-purple-600 text-2xl mb-2">📊</div>
-            <div className="text-sm font-medium text-gray-900">View Stats</div>
-            <div className="text-xs text-gray-600">Progress report</div>
-          </Link>
-          <Link 
-            href="/tasks"
-            className="p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-          >
-            <div className="text-orange-600 text-2xl mb-2">📝</div>
-            <div className="text-sm font-medium text-gray-900">Tasks</div>
-            <div className="text-xs text-gray-600">Manage tasks</div>
-          </Link>
+      {/* Statistics */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Today's Progress</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-600">{completedSessions}</div>
+            <div className="text-gray-600">Focus Sessions</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-600">
+              {Math.floor((completedSessions * TIMER_SETTINGS.focus) / 60)}
+            </div>
+            <div className="text-gray-600">Minutes Focused</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-purple-600">
+              {Math.floor((completedSessions * TIMER_SETTINGS.focus) / 3600)}
+            </div>
+            <div className="text-gray-600">Hours Focused</div>
+          </div>
         </div>
+      </div>
+
+      {/* Notification Settings */}
+      <div className="mt-6 text-center">
+        <button
+          onClick={requestNotificationPermission}
+          className="text-blue-600 hover:text-blue-500 text-sm"
+        >
+          Enable Browser Notifications
+        </button>
       </div>
     </div>
   )
